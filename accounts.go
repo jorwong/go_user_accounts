@@ -156,3 +156,92 @@ func createToken(email string) string {
 
 	return token
 }
+
+func logout(w http.ResponseWriter, req *http.Request) {
+	form := req.Body
+
+	var credentials struct {
+		Email string `json:"email"`
+	}
+
+	decoder := json.NewDecoder(form)
+	err := decoder.Decode(&credentials)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			return
+		}
+	}(req.Body)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if credentials.Email == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	foundUser, err := models.FindUserByEmail(credentials.Email)
+
+	if err != nil && err.Error() == "DB_ERROR" {
+		http.Error(w, "DB Error", http.StatusInternalServerError)
+	}
+
+	err = models.RevokeSession(foundUser)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func getProfile(w http.ResponseWriter, req *http.Request) {
+	form := req.Body
+
+	var credentials struct {
+		Session string `json:"session"`
+		Email   string `json:"email"`
+	}
+
+	decoder := json.NewDecoder(form)
+	err := decoder.Decode(&credentials)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			return
+		}
+	}(req.Body)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if credentials.Session == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	// check if upon calling is the session valid?
+	sessionKey, err := models.GetTokenFromRedis(credentials.Email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if sessionKey != credentials.Session {
+		http.Error(w, "Invalid Session", http.StatusUnauthorized)
+		return
+	}
+
+	User, err := models.FindUserByEmail(credentials.Email)
+	if err != nil || User == nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte(User.ToString()))
+	w.WriteHeader(http.StatusOK)
+}

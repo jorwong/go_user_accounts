@@ -8,13 +8,13 @@
     - GORM
 - Registration API endpoint (done)
 - User Login API (done)
-- Secure Session Creation
+- Secure Session Creation (done)
   - Upon successful login: generate a cryptographically secure, unique Session ID (e.g., UUID). Store the Session ID, User ID, Expiration Time, and Device Info in Redis.
 - Device Tracking Logic
   - When creating a session, extract and store basic device/client info (e.g., User-Agent string, IP address) and link it to the session record in Redis.
-- Logout / revoke session
+- Logout / revoke session (done)
   - Implement a /logout endpoint. Delete the Session ID key from Redis to immediately invalidate the session and token.
-- Fetch user profile api
+- Fetch user profile api 
   - Implement a /profile endpoint that requires a valid session token (middleware). Fetch and return basic user data from PostgreSQL.
 ---
 - Session Validation Middlware

@@ -16,6 +16,10 @@ type User struct {
 	Password   []byte
 }
 
+func (u *User) ToString() string {
+	return fmt.Sprintf("%s|%s", u.Name, u.Email)
+}
+
 func FindUserByEmail(email string) (*User, error) {
 	// search criteria
 	searchCriteria := User{

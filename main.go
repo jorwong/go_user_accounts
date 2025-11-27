@@ -15,6 +15,7 @@ func main() {
 	router.HandleFunc("/headers", headers).Methods("GET")
 	router.HandleFunc("/register", register).Methods("POST")
 	router.HandleFunc("/login", login).Methods("POST")
-
+	router.HandleFunc("/logout", logout).Methods("POST")
+	router.HandleFunc("/getProfile", getProfile).Methods("POST")
 	http.ListenAndServe(":8080", router)
 }
