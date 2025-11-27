@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/jorwong/go_user_accounts/models"
@@ -110,13 +112,34 @@ func login(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
 	}
+	timeExpire := time.Now().Add(time.Duration(time.Second) * 60) // expire after 60 seconds
+
+	token := createToken(foundUser.Email)
+	sessionToken, createdNew, err := models.CreateRedisSession(token, timeExpire, foundUser)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if !createdNew {
+		_, err := w.Write([]byte(sessionToken))
+		if err != nil {
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	// Create the session for this user
-	createdSession, err := models.CreateSession("heheHAHAH", foundUser)
+	createdSession, err := models.CreateSession(foundUser, timeExpire, token)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Write to redis
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write([]byte(createdSession.Token))
@@ -124,4 +147,12 @@ func login(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func createToken(email string) string {
+	h := sha256.New()
+	h.Write([]byte(time.Now().String() + email))
+	token := hex.EncodeToString(h.Sum(nil))
+
+	return token
 }

@@ -6,8 +6,8 @@
     - Device
   - Use PostgreSQL DB connections
     - GORM
-- Registration API endpoint
-- User Login API
+- Registration API endpoint (done)
+- User Login API (done)
 - Secure Session Creation
   - Upon successful login: generate a cryptographically secure, unique Session ID (e.g., UUID). Store the Session ID, User ID, Expiration Time, and Device Info in Redis.
 - Device Tracking Logic
