@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jorwong/go_user_accounts/connections"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"time"
@@ -31,7 +30,7 @@ func CreateSession(user *User, timeExpire time.Time, token string) (*Session, er
 
 // userId -> session
 func CreateRedisSession(token string, expireTime time.Time, user *User) (string, bool, error) {
-	rdb, err := connections.GetConnection()
+	rdb, err := GetConnectionToRedis()
 	if err != nil {
 		return "", false, err
 	}
@@ -67,7 +66,7 @@ func CreateRedisSession(token string, expireTime time.Time, user *User) (string,
 }
 
 func RevokeSession(user *User) error {
-	rdb, err := connections.GetConnection()
+	rdb, err := GetConnectionToRedis()
 	if err != nil {
 		return err
 	}
@@ -85,7 +84,7 @@ func RevokeSession(user *User) error {
 }
 
 func GetTokenFromRedis(email string) (string, error) {
-	rdb, err := connections.GetConnection()
+	rdb, err := GetConnectionToRedis()
 	if err != nil {
 		return "", err
 	}
@@ -99,4 +98,8 @@ func GetTokenFromRedis(email string) (string, error) {
 		return "", err
 	}
 	return sessionKey, nil
+}
+
+func SessionValid(email string, session string) (bool, error) {
+	return false, nil
 }

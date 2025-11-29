@@ -1,4 +1,4 @@
-package connections
+package models
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 var redisClient *redis.Client
 
-func GetConnection() (*redis.Client, error) {
+func GetConnectionToRedis() (*redis.Client, error) {
 	var err error
 
 	if redisClient == nil {

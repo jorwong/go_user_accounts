@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"crypto/sha256"
@@ -6,36 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jorwong/go_user_accounts/models"
+	pkg "github.com/jorwong/go_user_accounts/pkg/ratelimit"
 	"io"
 	"net/http"
 	"time"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	fmt.Println("server: hello handler started")
-	defer fmt.Println("server: hello handler ended")
-
-	select {
-	case <-ctx.Done():
-		err := ctx.Err()
-		fmt.Println("server:", err)
-		internalError := http.StatusInternalServerError
-		http.Error(w, err.Error(), internalError)
-	case <-time.After(10 * time.Second):
-		fmt.Fprintf(w, "Hello World")
-	}
-}
-
-func headers(w http.ResponseWriter, req *http.Request) {
-	for name, headers := range req.Header {
-		for _, h := range headers {
-			fmt.Fprintf(w, "%v: %v\n", name, h)
-		}
-	}
-}
-
-func register(w http.ResponseWriter, req *http.Request) {
+func Register(w http.ResponseWriter, req *http.Request) {
 	form := req.Body
 
 	var registerForm struct {
@@ -74,7 +51,7 @@ func register(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func login(w http.ResponseWriter, req *http.Request) {
+func Login(w http.ResponseWriter, req *http.Request) {
 	form := req.Body
 
 	var credentials struct {
@@ -112,6 +89,12 @@ func login(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
 	}
+
+	if !pkg.IsAllowed(foundUser.Email) {
+		http.Error(w, "Rate Limited", http.StatusTooManyRequests)
+		return
+	}
+
 	timeExpire := time.Now().Add(time.Duration(time.Second) * 60) // expire after 60 seconds
 
 	token := createToken(foundUser.Email)
@@ -157,7 +140,7 @@ func createToken(email string) string {
 	return token
 }
 
-func logout(w http.ResponseWriter, req *http.Request) {
+func Logout(w http.ResponseWriter, req *http.Request) {
 	form := req.Body
 
 	var credentials struct {
@@ -197,7 +180,7 @@ func logout(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func getProfile(w http.ResponseWriter, req *http.Request) {
+func GetProfile(w http.ResponseWriter, req *http.Request) {
 	form := req.Body
 
 	var credentials struct {
@@ -225,15 +208,18 @@ func getProfile(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// check if upon calling is the session valid?
-	sessionKey, err := models.GetTokenFromRedis(credentials.Email)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
-	if sessionKey != credentials.Session {
-		http.Error(w, "Invalid Session", http.StatusUnauthorized)
-		return
+	message, result := CheckIfUserSessionIsValid(credentials.Session, credentials.Email)
+
+	if result == false {
+		switch message {
+		case ERROR:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		case INVALID_SESSION:
+			http.Error(w, "Invalid Session", http.StatusBadRequest)
+			return
+		}
 	}
 
 	User, err := models.FindUserByEmail(credentials.Email)

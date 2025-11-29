@@ -14,10 +14,10 @@
   - When creating a session, extract and store basic device/client info (e.g., User-Agent string, IP address) and link it to the session record in Redis.
 - Logout / revoke session (done)
   - Implement a /logout endpoint. Delete the Session ID key from Redis to immediately invalidate the session and token.
-- Fetch user profile api 
+- Fetch user profile api (done)
   - Implement a /profile endpoint that requires a valid session token (middleware). Fetch and return basic user data from PostgreSQL.
 ---
-- Session Validation Middlware
+- Session Validation Middleware (done)
   - Create a Go HTTP middleware that runs on all protected routes (like /profile, /logout). The middleware must check the session token against Redis for quick lookups.
 - Token Bucket Rate Limiter
   - Implement a server-side token bucket rate limiter specifically for the /login endpoint to prevent brute-force attacks. Store the rate limit state (token count, last refill time) in-memory or in Redis and protect access using Go's sync.Mutex or a channel pattern for concurrency.
@@ -49,3 +49,5 @@ account-service-go/
 ├── main.go          # Entry point, server setup, config loading
 └── go.mod
 ```
+
+api -> models ->

@@ -51,10 +51,6 @@ func CreateUser(email string, name string, password string) error {
 }
 
 func (u *User) CheckPasswordHash(password string) bool {
-	fmt.Println(password)
-	fmt.Println(u.Password)
 	err := bcrypt.CompareHashAndPassword(u.Password, []byte(password))
-
-	fmt.Println(err)
 	return err == nil
 }
