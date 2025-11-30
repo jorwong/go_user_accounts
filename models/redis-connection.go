@@ -11,6 +11,9 @@ var (
 )
 
 func GetConnectionToRedis() *redis.Client {
+	if rdb != nil {
+		return rdb
+	}
 	once.Do(func() {
 		rdb = redis.NewClient(&redis.Options{
 			Addr:     "localhost:6379", // Check your address

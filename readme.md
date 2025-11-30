@@ -21,13 +21,14 @@
   - Create a Go HTTP middleware that runs on all protected routes (like /profile, /logout). The middleware must check the session token against Redis for quick lookups.
 - Token Bucket Rate Limiter (done)
   - Implement a server-side token bucket rate limiter specifically for the /login endpoint to prevent brute-force attacks. Store the rate limit state (token count, last refill time) in-memory or in Redis and protect access using Go's sync.Mutex or a channel pattern for concurrency.
-- Go Concurrency for Logs
+- Go Concurrency for Logs (done)
   - Use a Goroutine and a Channel pattern to asynchronously log login attempts (success and failure) to a file or database after the request has been handled. This ensures the logging doesn't block the main request handler.
-- Connection pooling
+- Connection pooling (done)
   - Configure and use robust connection pooling for both PostgreSQL and Redis to handle a large number of concurrent connections efficiently.
-- Graceful Shutdown
+- Graceful Shutdown (done)
   - Implement logic to shut down the server gracefully using Go's context package. This includes waiting for active requests to finish and properly closing database/Redis connections.
 - JWT sessions
+- RBAC
 ---
 ### Potential Struct
 ```
