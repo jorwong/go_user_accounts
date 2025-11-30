@@ -19,7 +19,7 @@
 ---
 - Session Validation Middleware (done)
   - Create a Go HTTP middleware that runs on all protected routes (like /profile, /logout). The middleware must check the session token against Redis for quick lookups.
-- Token Bucket Rate Limiter
+- Token Bucket Rate Limiter (done)
   - Implement a server-side token bucket rate limiter specifically for the /login endpoint to prevent brute-force attacks. Store the rate limit state (token count, last refill time) in-memory or in Redis and protect access using Go's sync.Mutex or a channel pattern for concurrency.
 - Go Concurrency for Logs
   - Use a Goroutine and a Channel pattern to asynchronously log login attempts (success and failure) to a file or database after the request has been handled. This ensures the logging doesn't block the main request handler.

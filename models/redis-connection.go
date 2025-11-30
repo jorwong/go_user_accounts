@@ -1,31 +1,23 @@
 package models
 
 import (
-	"context"
 	"github.com/redis/go-redis/v9"
+	"sync"
 )
 
-var redisClient *redis.Client
+var (
+	rdb  *redis.Client
+	once sync.Once // 1. Add this variable
+)
 
-func GetConnectionToRedis() (*redis.Client, error) {
-	var err error
-
-	if redisClient == nil {
-		rdb := redis.NewClient(&redis.Options{
-			Addr:     "localhost:6379",
-			Password: "", // no password
-			DB:       0,  // use default DB
-			Protocol: 2,
+func GetConnectionToRedis() *redis.Client {
+	once.Do(func() {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     "localhost:6379", // Check your address
+			Password: "",               // No password set
+			DB:       0,                // Use default DB
 		})
+	})
 
-		ctx := context.Background()
-		err := rdb.Ping(ctx).Err()
-		if err != nil {
-			return nil, err
-		}
-
-		redisClient = rdb
-	}
-
-	return redisClient, err
+	return rdb
 }

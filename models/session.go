@@ -30,10 +30,8 @@ func CreateSession(user *User, timeExpire time.Time, token string) (*Session, er
 
 // userId -> session
 func CreateRedisSession(token string, expireTime time.Time, user *User) (string, bool, error) {
-	rdb, err := GetConnectionToRedis()
-	if err != nil {
-		return "", false, err
-	}
+	rdb := GetConnectionToRedis()
+
 	// Create Redis Session if it doesnt exist in the DB else GET
 	key := fmt.Sprintf("session:%s", user.Email)
 	durationUntilExpiration := expireTime.Sub(time.Now())
@@ -66,16 +64,13 @@ func CreateRedisSession(token string, expireTime time.Time, user *User) (string,
 }
 
 func RevokeSession(user *User) error {
-	rdb, err := GetConnectionToRedis()
-	if err != nil {
-		return err
-	}
+	rdb := GetConnectionToRedis()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	key := fmt.Sprintf("session:%s", user.Email)
-	err = rdb.Del(ctx, key).Err()
+	err := rdb.Del(ctx, key).Err()
 
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
@@ -84,10 +79,7 @@ func RevokeSession(user *User) error {
 }
 
 func GetTokenFromRedis(email string) (string, error) {
-	rdb, err := GetConnectionToRedis()
-	if err != nil {
-		return "", err
-	}
+	rdb := GetConnectionToRedis()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

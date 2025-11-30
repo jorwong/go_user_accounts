@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jorwong/go_user_accounts/models"
-	pkg "github.com/jorwong/go_user_accounts/pkg/ratelimit"
+	pkg "github.com/jorwong/go_user_accounts/pkg/logging"
+	ratelimit "github.com/jorwong/go_user_accounts/pkg/ratelimit"
 	"io"
 	"net/http"
 	"time"
@@ -69,11 +70,13 @@ func Login(w http.ResponseWriter, req *http.Request) {
 	}(req.Body)
 
 	if err != nil {
+		pkg.LogChannel <- time.Now().String() + "," + "Bad Request: " + err.Error()
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if credentials.Email == "" || credentials.Password == "" {
+		pkg.LogChannel <- time.Now().String() + "," + "Missing required fields (Email, or Password)."
 		http.Error(w, "Missing required fields (Email, or Password).", http.StatusBadRequest)
 		return
 	}
@@ -81,16 +84,21 @@ func Login(w http.ResponseWriter, req *http.Request) {
 	foundUser, err := models.FindUserByEmail(credentials.Email)
 
 	if err != nil && err.Error() == "DB_ERROR" {
+		pkg.LogChannel <- time.Now().String() + "," + "DB ERROR"
 		http.Error(w, "DB Error", http.StatusInternalServerError)
 		return
 	}
 
 	if foundUser == nil || !foundUser.CheckPasswordHash(credentials.Password) {
+		pkg.LogChannel <- time.Now().String() + "," + "Invalid Credentials for " + credentials.Email
+
 		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
 	}
 
-	if !pkg.IsAllowed(foundUser.Email) {
+	if !ratelimit.IsAllowed(foundUser.Email) {
+		pkg.LogChannel <- time.Now().String() + "," + "Rate Limited for " + credentials.Email
+
 		http.Error(w, "Rate Limited", http.StatusTooManyRequests)
 		return
 	}
@@ -130,6 +138,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	pkg.LogChannel <- time.Now().String() + "," + "Successful Login for " + foundUser.Email
 }
 
 func createToken(email string) string {

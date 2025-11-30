@@ -23,11 +23,7 @@ func IsAllowed(email string) bool {
 
 	currentTime := time.Now()
 
-	rdb, err := models.GetConnectionToRedis()
-	if err != nil {
-		fmt.Println("Error getting Redis connection:", err)
-		return false
-	}
+	rdb := models.GetConnectionToRedis()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -36,7 +32,7 @@ func IsAllowed(email string) bool {
 	var lastTokenCount int64
 	var allowed bool
 
-	err = rdb.Watch(ctx, func(tx *redis.Tx) error {
+	err := rdb.Watch(ctx, func(tx *redis.Tx) error {
 		strTime, err := tx.Get(ctx, keyLastRefilled).Result()
 		if err != nil && err != redis.Nil {
 			return err
@@ -68,13 +64,9 @@ func IsAllowed(email string) bool {
 		timePassedMins := currentTime.Sub(lastRetrievedTime).Minutes()
 		rawTokenToRefill := timePassedMins * float64(REFILL_RATE_PER_MINUITE)
 		tokenToRefill := int64(rawTokenToRefill)
-
-		fmt.Println("tokenToRefill", tokenToRefill)
 		// Clamp the new token count at the maximum bucket size
 		tokenCount := int(math.Min(float64(lastTokenCount+tokenToRefill), RATE_LIMIT))
 
-		fmt.Println("token count: ", tokenCount)
-		fmt.Println("lastTokenCount: ", lastTokenCount)
 		// Check if request is allowed
 		allowed = false
 		if tokenCount >= 1 {
