@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	RATE_LIMIT              = 10
+	RATE_LIMIT              = 200
 	REFILL_RATE_PER_MINUITE = 1
 )
 
-func IsAllowed(email string) bool {
+func IsAllowed(email string) (bool, error) {
 	// 🔑 Keys for Redis storage
 	keyLastRefilled := "rate_limit:" + email + ":last_refilled"
 	keyTokenCount := "rate_limit:" + email + ":token_count"
@@ -83,7 +83,7 @@ func IsAllowed(email string) bool {
 		})
 
 		if allowed {
-			return nil
+			return err // Return the error from TxPipelined
 		}
 
 		return errors.New("RATE_LIMITED")
@@ -93,15 +93,15 @@ func IsAllowed(email string) bool {
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			// key doesnt exist
-			return true
+			return true, nil
 		}
 		if err.Error() == "RATE_LIMITED" {
 			// This is the expected case when tokenCount was < 1
-			return false
+			return false, err
 		}
 		fmt.Println("Error in Redis transaction pipeline:", err)
-		return false // Network error or other Redis error
+		return false, err // Network error or other Redis error
 	}
 
-	return true // Allowed and updates were made atomically
+	return true, nil // Allowed and updates were made atomically
 }

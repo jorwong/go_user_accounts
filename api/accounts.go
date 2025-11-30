@@ -96,7 +96,13 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !ratelimit.IsAllowed(foundUser.Email) {
+	ifIsAllowed, err := ratelimit.IsAllowed(foundUser.Email)
+	if err != nil && err.Error() != "RATE_LIMITED" {
+		pkg.LogChannel <- time.Now().String() + "," + err.Error()
+		http.Error(w, "ERROR", http.StatusInternalServerError)
+		return
+	}
+	if !ifIsAllowed {
 		pkg.LogChannel <- time.Now().String() + "," + "Rate Limited for " + credentials.Email
 
 		http.Error(w, "Rate Limited", http.StatusTooManyRequests)
@@ -118,6 +124,7 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			return
 		}
+		pkg.LogChannel <- time.Now().String() + "," + "Successful Login for " + foundUser.Email
 		w.WriteHeader(http.StatusOK)
 		return
 	}
