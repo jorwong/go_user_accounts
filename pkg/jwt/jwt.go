@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"net/http"
@@ -10,11 +11,18 @@ import (
 
 var secret = []byte("secret")
 
+// ContextKey is a custom type for context keys to avoid collisions
+type ContextKey string
+
+// UserEmailKey is the context key for storing the user email from JWT claims
+const UserEmailKey ContextKey = "userEmail"
+
 // GenerateJWT creates a new JWT token for the given username.
 // The token includes the following claims:
 //   - "user": the provided username
 //   - "authorized": a boolean set to true
 //   - "exp": expiration time set to 3 minutes from creation
+//
 // It returns the signed JWT token string, or an error if signing fails.
 func GenerateJWT(username string) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
@@ -80,7 +88,24 @@ func VerifyJWT(endpointHandler http.Handler) http.Handler {
 			return
 		}
 
-		// 6. Token is valid: Pass control to the next handler in the chain
+		// 6. Extract user email from claims and store in context
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			http.Error(writer, "Invalid token claims", http.StatusUnauthorized)
+			return
+		}
+
+		userEmail, ok := claims["user"].(string)
+		if !ok {
+			http.Error(writer, "User email not found in token", http.StatusUnauthorized)
+			return
+		}
+
+		// 7. Add user email to request context
+		ctx := context.WithValue(request.Context(), UserEmailKey, userEmail)
+		request = request.WithContext(ctx)
+
+		// 8. Token is valid: Pass control to the next handler in the chain
 		endpointHandler.ServeHTTP(writer, request)
 	})
 }
