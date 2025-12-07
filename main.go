@@ -26,6 +26,10 @@ func main() {
 			auth.UnaryServerInterceptor(api.Authenticator),
 			selector.MatchFunc(api.AuthMatcher),
 		),
+		selector.UnaryServerInterceptor(
+			api.RateLimter,
+			selector.MatchFunc(api.RateLimiterMatcher),
+		),
 	))
 	pb.RegisterUserAccountsServer(s, &api.Server{})
 	reflection.Register(s)

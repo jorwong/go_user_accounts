@@ -6,7 +6,6 @@ import (
 	"github.com/jorwong/go_user_accounts/pb"
 	jwt "github.com/jorwong/go_user_accounts/pkg/jwt"
 	pkg "github.com/jorwong/go_user_accounts/pkg/logging"
-	ratelimit "github.com/jorwong/go_user_accounts/pkg/ratelimit"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"time"
@@ -53,17 +52,17 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginReply
 		return nil, status.Errorf(codes.Unauthenticated, "Invalid Credentials")
 	}
 
-	ifIsAllowed, err := ratelimit.IsAllowed(foundUser.Email)
-	if err != nil && err.Error() != "RATE_LIMITED" {
-		pkg.LogChannel <- time.Now().String() + "," + err.Error()
-		return nil, status.Errorf(codes.Internal, "ERROR :"+err.Error())
-	}
-
-	if !ifIsAllowed {
-		pkg.LogChannel <- time.Now().String() + "," + "Rate Limited for " + in.Email
-
-		return nil, status.Errorf(codes.ResourceExhausted, "Rate Limited")
-	}
+	//ifIsAllowed, err := ratelimit.IsAllowed(foundUser.Email)
+	//if err != nil && err.Error() != "RATE_LIMITED" {
+	//	pkg.LogChannel <- time.Now().String() + "," + err.Error()
+	//	return nil, status.Errorf(codes.Internal, "ERROR :"+err.Error())
+	//}
+	//
+	//if !ifIsAllowed {
+	//	pkg.LogChannel <- time.Now().String() + "," + "Rate Limited for " + in.Email
+	//
+	//	return nil, status.Errorf(codes.ResourceExhausted, "Rate Limited")
+	//}
 
 	jwtToken, err := jwt.GenerateJWT(foundUser.Email)
 	if err != nil {
