@@ -179,5 +179,8 @@ func GetProfile(w http.ResponseWriter, req *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(User.ToString()))
+	_, err = w.Write([]byte(User.ToString()))
+	if err != nil {
+		return
+	}
 }
