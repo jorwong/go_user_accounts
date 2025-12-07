@@ -108,7 +108,6 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-
 	jwtToken, err := jwt.GenerateJWT(foundUser.Email)
 	if err != nil {
 		fmt.Println(err)
@@ -165,38 +164,20 @@ func Logout(w http.ResponseWriter, req *http.Request) {
 }
 
 func GetProfile(w http.ResponseWriter, req *http.Request) {
-	form := req.Body
-
-	var credentials struct {
-		Session string `json:"session"`
-		Email   string `json:"email"`
-	}
-
-	decoder := json.NewDecoder(form)
-	err := decoder.Decode(&credentials)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(req.Body)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Extract user email from JWT token stored in context by middleware
+	userEmail, ok := req.Context().Value(jwt.UserEmailKey).(string)
+	if !ok || userEmail == "" {
+		http.Error(w, "User email not found in token", http.StatusUnauthorized)
 		return
 	}
 
-	if credentials.Session == "" {
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
-		return
-	}
-
-	User, err := models.FindUserByEmail(credentials.Email)
+	// Find user by email from JWT claims
+	User, err := models.FindUserByEmail(userEmail)
 	if err != nil || User == nil {
 		http.Error(w, "error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Write([]byte(User.ToString()))
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(User.ToString()))
 }
