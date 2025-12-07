@@ -1,202 +1,109 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
+	"context"
 	"github.com/jorwong/go_user_accounts/models"
+	"github.com/jorwong/go_user_accounts/pb"
 	jwt "github.com/jorwong/go_user_accounts/pkg/jwt"
 	pkg "github.com/jorwong/go_user_accounts/pkg/logging"
 	ratelimit "github.com/jorwong/go_user_accounts/pkg/ratelimit"
-	"io"
-	"net/http"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"time"
 )
 
-func Register(w http.ResponseWriter, req *http.Request) {
-	form := req.Body
-
-	var registerForm struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-
-	decoder := json.NewDecoder(form)
-	err := decoder.Decode(&registerForm)
-	defer req.Body.Close() // <-- FIX: Ensure the request body stream is closed
-
-	if registerForm.Name == "" || registerForm.Email == "" || registerForm.Password == "" {
-		// If any required field is empty
-		http.Error(w, "Missing required fields (Name, Email, or Password).", http.StatusBadRequest)
-		return
-	}
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = models.CreateUser(registerForm.Email, registerForm.Name, registerForm.Password)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusCreated)
-	responseMessage := "User registered successfully!"
-	_, err = w.Write([]byte(responseMessage))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+type Server struct {
+	pb.UserAccountsServer
 }
 
-func Login(w http.ResponseWriter, req *http.Request) {
-	form := req.Body
+func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterReply, error) {
 
-	var credentials struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+	if in.Name == "" || in.Email == "" || in.Password == "" {
+		// If any required field is empty
+		return nil, status.Errorf(codes.InvalidArgument, "Missing Argument")
 	}
 
-	decoder := json.NewDecoder(form)
-	err := decoder.Decode(&credentials)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(req.Body)
-
+	err := models.CreateUser(in.Email, in.Name, in.Password)
 	if err != nil {
-		pkg.LogChannel <- time.Now().String() + "," + "Bad Request: " + err.Error()
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil, status.Errorf(codes.Internal, "Internal Server Error")
 	}
 
-	if credentials.Email == "" || credentials.Password == "" {
+	return &pb.RegisterReply{
+		Message: "User Registered Successfully",
+	}, nil
+}
+
+func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginReply, error) {
+
+	if in.Email == "" || in.Password == "" {
 		pkg.LogChannel <- time.Now().String() + "," + "Missing required fields (Email, or Password)."
-		http.Error(w, "Missing required fields (Email, or Password).", http.StatusBadRequest)
-		return
+		return nil, status.Errorf(codes.InvalidArgument, "Missing required fields (Email, or Password).")
 	}
 
-	foundUser, err := models.FindUserByEmail(credentials.Email)
+	foundUser, err := models.FindUserByEmail(in.Email)
 
 	if err != nil && err.Error() == "DB_ERROR" {
 		pkg.LogChannel <- time.Now().String() + "," + "DB ERROR"
-		http.Error(w, "DB Error", http.StatusInternalServerError)
-		return
+		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
 	}
 
-	if foundUser == nil || !foundUser.CheckPasswordHash(credentials.Password) {
-		pkg.LogChannel <- time.Now().String() + "," + "Invalid Credentials for " + credentials.Email
+	if foundUser == nil || !foundUser.CheckPasswordHash(in.Password) {
+		pkg.LogChannel <- time.Now().String() + "," + "Invalid Credentials for " + in.Email
 
-		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
-		return
+		return nil, status.Errorf(codes.Unauthenticated, "Invalid Credentials")
 	}
 
 	ifIsAllowed, err := ratelimit.IsAllowed(foundUser.Email)
 	if err != nil && err.Error() != "RATE_LIMITED" {
 		pkg.LogChannel <- time.Now().String() + "," + err.Error()
-		http.Error(w, "ERROR", http.StatusInternalServerError)
-		return
+		return nil, status.Errorf(codes.Internal, "ERROR :"+err.Error())
 	}
+
 	if !ifIsAllowed {
-		pkg.LogChannel <- time.Now().String() + "," + "Rate Limited for " + credentials.Email
+		pkg.LogChannel <- time.Now().String() + "," + "Rate Limited for " + in.Email
 
-		http.Error(w, "Rate Limited", http.StatusTooManyRequests)
-		return
+		return nil, status.Errorf(codes.ResourceExhausted, "Rate Limited")
 	}
-
 
 	jwtToken, err := jwt.GenerateJWT(foundUser.Email)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return nil, status.Errorf(codes.Internal, "ERROR :"+err.Error())
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write([]byte("TOKEN: " + jwtToken))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	pkg.LogChannel <- time.Now().String() + "," + "Successful Login for " + foundUser.Email
+	return &pb.LoginReply{Message: "TOKEN: " + jwtToken}, nil
 }
 
-func Logout(w http.ResponseWriter, req *http.Request) {
-	form := req.Body
+func (s *Server) Logout(ctx context.Context, in *pb.LogOutRequest) (*pb.LogOutReply, error) {
 
-	var credentials struct {
-		Email string `json:"email"`
+	if in.Email == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "Missing required fields (Email).")
 	}
 
-	decoder := json.NewDecoder(form)
-	err := decoder.Decode(&credentials)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(req.Body)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if credentials.Email == "" {
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
-		return
-	}
-
-	foundUser, err := models.FindUserByEmail(credentials.Email)
+	foundUser, err := models.FindUserByEmail(in.Email)
 
 	if err != nil && err.Error() == "DB_ERROR" {
-		http.Error(w, "DB Error", http.StatusInternalServerError)
+		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
 	}
 
 	err = models.RevokeSession(foundUser)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	return &pb.LogOutReply{}, nil
 }
 
-func GetProfile(w http.ResponseWriter, req *http.Request) {
-	form := req.Body
+func (s *Server) Profile(ctx context.Context, in *pb.ProfileRequest) (*pb.ProfileReply, error) {
 
-	var credentials struct {
-		Session string `json:"session"`
-		Email   string `json:"email"`
+	if in.Email == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "Missing required fields (Email).")
 	}
 
-	decoder := json.NewDecoder(form)
-	err := decoder.Decode(&credentials)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(req.Body)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if credentials.Session == "" {
-		http.Error(w, "Missing required fields", http.StatusBadRequest)
-		return
-	}
-
-	User, err := models.FindUserByEmail(credentials.Email)
+	User, err := models.FindUserByEmail(in.Email)
 	if err != nil || User == nil {
-		http.Error(w, "error", http.StatusInternalServerError)
-		return
+		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
 	}
 
-	w.Write([]byte(User.ToString()))
-	w.WriteHeader(http.StatusOK)
+	return &pb.ProfileReply{Message: User.Email + "|" + User.Name}, nil
 }

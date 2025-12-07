@@ -1,0 +1,44 @@
+syntax = "proto3";
+option go_package = "/pb";
+package api;
+
+service UserAccounts {
+  rpc Register (RegisterRequest) returns (RegisterReply) {}
+  rpc Login (LoginRequest) returns (LoginReply) {}
+  rpc Logout (LogOutRequest) returns (LogOutReply) {}
+  rpc Profile (ProfileRequest) returns (ProfileReply) {}
+}
+
+message RegisterRequest {
+  string name = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message RegisterReply {
+  string message = 1;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginReply {
+  string message = 1;
+}
+
+message LogOutRequest {
+  string email = 1;
+}
+
+message LogOutReply {
+}
+
+message ProfileRequest {
+  string email = 1;
+}
+
+message ProfileReply {
+  string message = 1;
+}
