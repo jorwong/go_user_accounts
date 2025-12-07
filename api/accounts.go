@@ -108,7 +108,6 @@ func Login(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	//timeExpire := time.Now().Add(time.Duration(time.Second) * 60) // expire after 60 seconds
 
 	jwtToken, err := jwt.GenerateJWT(foundUser.Email)
 	if err != nil {

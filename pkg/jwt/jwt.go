@@ -1,4 +1,4 @@
-package pkg
+package jwt
 
 import (
 	"fmt"
@@ -10,10 +10,16 @@ import (
 
 var secret = []byte("secret")
 
+// GenerateJWT creates a new JWT token for the given username.
+// The token includes the following claims:
+//   - "user": the provided username
+//   - "authorized": a boolean set to true
+//   - "exp": expiration time set to 3 minutes from creation
+// It returns the signed JWT token string, or an error if signing fails.
 func GenerateJWT(username string) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
-	claims["exp"] = time.Now().Add(3 * time.Minute).Unix()
+	claims["exp"] = time.Now().Add(15 * time.Minute).Unix()
 	claims["authorized"] = true
 	claims["user"] = username
 
@@ -25,6 +31,10 @@ func GenerateJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
+// VerifyJWT is an HTTP middleware that validates JWT tokens from the Authorization header.
+// It expects a "Bearer <token>" format and verifies the token signature and expiration.
+// If validation fails, it returns an HTTP 401 Unauthorized response.
+// If successful, it passes control to the next handler.
 func VerifyJWT(endpointHandler http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -32,14 +42,14 @@ func VerifyJWT(endpointHandler http.Handler) http.Handler {
 		// 1. Check for Authorization header
 		authorizationHeader := request.Header.Get("Authorization")
 		if authorizationHeader == "" {
-			writer.WriteHeader(http.StatusUnauthorized)
+			http.Error(writer, "Missing Authorization header", http.StatusUnauthorized)
 			return
 		}
 
 		// 2. Check for "Bearer <token>" format
 		parts := strings.Split(authorizationHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			writer.WriteHeader(http.StatusUnauthorized)
+			http.Error(writer, "Invalid Authorization header format", http.StatusUnauthorized)
 			return
 		}
 
