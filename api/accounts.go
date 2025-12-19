@@ -8,11 +8,13 @@ import (
 	pkg "github.com/jorwong/go_user_accounts/pkg/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 	"time"
 )
 
 type Server struct {
 	pb.UserAccountsServer
+	DB *gorm.DB
 }
 
 func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterReply, error) {
@@ -22,7 +24,7 @@ func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.Regi
 		return nil, status.Errorf(codes.InvalidArgument, "Missing Argument")
 	}
 
-	err := models.CreateUser(in.Email, in.Name, in.Password)
+	err := models.CreateUser(in.Email, in.Name, in.Password, s.DB)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Internal Server Error")
 	}
@@ -39,7 +41,7 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginRequest) (*pb.LoginReply
 		return nil, status.Errorf(codes.InvalidArgument, "Missing required fields (Email, or Password).")
 	}
 
-	foundUser, err := models.FindUserByEmail(in.Email)
+	foundUser, err := models.FindUserByEmail(in.Email, s.DB)
 
 	if err != nil && err.Error() == "DB_ERROR" {
 		pkg.LogChannel <- time.Now().String() + "," + "DB ERROR"
@@ -79,7 +81,7 @@ func (s *Server) Logout(ctx context.Context, in *pb.LogOutRequest) (*pb.LogOutRe
 		return nil, status.Errorf(codes.InvalidArgument, "Missing required fields (Email).")
 	}
 
-	foundUser, err := models.FindUserByEmail(in.Email)
+	foundUser, err := models.FindUserByEmail(in.Email, s.DB)
 
 	if err != nil && err.Error() == "DB_ERROR" {
 		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
@@ -99,7 +101,7 @@ func (s *Server) Profile(ctx context.Context, in *pb.ProfileRequest) (*pb.Profil
 		return nil, status.Errorf(codes.InvalidArgument, "Missing required fields (Email).")
 	}
 
-	User, err := models.FindUserByEmail(in.Email)
+	User, err := models.FindUserByEmail(in.Email, s.DB)
 	if err != nil || User == nil {
 		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
 	}

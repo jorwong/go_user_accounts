@@ -18,7 +18,7 @@ type Session struct {
 	User   User // GORM automatically handles the association
 }
 
-func CreateSession(user *User, timeExpire time.Time, token string) (*Session, error) {
+func CreateSession(user *User, timeExpire time.Time, token string, DB *gorm.DB) (*Session, error) {
 
 	newSession := Session{Token: token, UserID: user.ID, Expire: timeExpire}
 	result := DB.Create(&newSession)
@@ -53,7 +53,7 @@ func CreateRedisSession(token string, expireTime time.Time, user *User) (string,
 
 	if err != nil && !errors.Is(err, redis.Nil) {
 		// redis.Nil error means the key did not exist before the set. This is not a failure.
-		return "", false, fmt.Errorf("redis SET command failed for user %s: %w", user.UserID, err)
+		return "", false, fmt.Errorf("redis SET command failed for user %d: %w", user.UserID, err)
 	}
 
 	if existingValue == "" || errors.Is(err, redis.Nil) {

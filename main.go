@@ -14,7 +14,10 @@ import (
 )
 
 func main() {
-	models.InitDB()
+	DB, err := models.InitDB()
+	if err != nil {
+		return
+	}
 	pkg.StartLoggerWorker()
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -31,7 +34,10 @@ func main() {
 			selector.MatchFunc(api.RateLimiterMatcher),
 		),
 	))
-	pb.RegisterUserAccountsServer(s, &api.Server{})
+
+	server := &api.Server{DB: DB}
+
+	pb.RegisterUserAccountsServer(s, server)
 	reflection.Register(s)
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {

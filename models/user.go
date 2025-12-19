@@ -20,7 +20,7 @@ func (u *User) ToString() string {
 	return fmt.Sprintf("%s|%s", u.Name, u.Email)
 }
 
-func FindUserByEmail(email string) (*User, error) {
+func FindUserByEmail(email string, DB *gorm.DB) (*User, error) {
 	// search criteria
 	searchCriteria := User{
 		Email: email,
@@ -41,7 +41,7 @@ func FindUserByEmail(email string) (*User, error) {
 	return &retrievedUser, nil
 }
 
-func CreateUser(email string, name string, password string) error {
+func CreateUser(email string, name string, password string, DB *gorm.DB) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
