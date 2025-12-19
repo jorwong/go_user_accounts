@@ -9,6 +9,7 @@ import (
 	"github.com/jorwong/go_user_accounts/pb"
 	pkg2 "github.com/jorwong/go_user_accounts/pkg/logging"
 	pkg "github.com/jorwong/go_user_accounts/pkg/ratelimit"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -75,54 +76,56 @@ func AuthMatcher(ctx context.Context, callMeta interceptors.CallMeta) bool { // 
 	return requiresAuth
 }
 
-func RateLimter(ctx context.Context,
-	req interface{},
-	info *grpc.UnaryServerInfo,
-	handler grpc.UnaryHandler) (interface{}, error) {
-	fullMethod := info.FullMethod
-	var email string
+func RateLimiterInterceptor(rdb *redis.Client) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler) (interface{}, error) {
+		fullMethod := info.FullMethod
+		var email string
 
-	// You MUST still use the switch statement to correctly cast the 'req'
-	// to the appropriate type for the method and extract the email field.
-	switch fullMethod {
-	case "/api.UserAccounts/Profile":
-		if updateReq, ok := req.(*pb.ProfileRequest); ok {
-			// Assuming the type is defined in this package
-			email = updateReq.GetEmail()
+		// You MUST still use the switch statement to correctly cast the 'req'
+		// to the appropriate type for the method and extract the email field.
+		switch fullMethod {
+		case "/api.UserAccounts/Profile":
+			if updateReq, ok := req.(*pb.ProfileRequest); ok {
+				// Assuming the type is defined in this package
+				email = updateReq.GetEmail()
+			}
+		case "/api.UserAccounts/Login":
+			if postReq, ok := req.(*pb.LoginRequest); ok {
+				email = postReq.GetEmail()
+			}
+		default:
+			// This case should ideally not be hit if the matcher is correct,
+			// but it's a good safeguard.
+			fmt.Printf("Warning: RateLimiterInterceptor triggered for unknown method: %s\n", fullMethod)
 		}
-	case "/api.UserAccounts/Login":
-		if postReq, ok := req.(*pb.LoginRequest); ok {
-			email = postReq.GetEmail()
+
+		// 3. Perform Rate Limiting Logic using the extracted email
+		if email != "" {
+			fmt.Printf("Applying rate limit for email: %s\n", email)
+
+			// **ACTUAL RATE LIMITING LOGIC**
+			// Example: Check rate limit against Redis
+			ifIsAllowed, err := pkg.IsAllowed(email, rdb)
+			if err != nil && err.Error() != "RATE_LIMITED" {
+				pkg2.LogChannel <- time.Now().String() + "," + err.Error()
+				return nil, status.Errorf(codes.Internal, "ERROR :"+err.Error())
+			}
+			if !ifIsAllowed {
+				pkg2.LogChannel <- time.Now().String() + "," + "Rate Limited for " + email
+
+				return nil, status.Errorf(codes.ResourceExhausted, "Rate Limited")
+			}
+		} else {
+			// Handle cases where the email field is missing/empty
+			fmt.Printf("Could not extract email for method: %s\n", fullMethod)
 		}
-	default:
-		// This case should ideally not be hit if the matcher is correct,
-		// but it's a good safeguard.
-		fmt.Printf("Warning: RateLimiterInterceptor triggered for unknown method: %s\n", fullMethod)
+
+		// 4. Proceed to the next handler
+		return handler(ctx, req)
 	}
-
-	// 3. Perform Rate Limiting Logic using the extracted email
-	if email != "" {
-		fmt.Printf("Applying rate limit for email: %s\n", email)
-
-		// **ACTUAL RATE LIMITING LOGIC**
-		// Example: Check rate limit against Redis
-		ifIsAllowed, err := pkg.IsAllowed(email)
-		if err != nil && err.Error() != "RATE_LIMITED" {
-			pkg2.LogChannel <- time.Now().String() + "," + err.Error()
-			return nil, status.Errorf(codes.Internal, "ERROR :"+err.Error())
-		}
-		if !ifIsAllowed {
-			pkg2.LogChannel <- time.Now().String() + "," + "Rate Limited for " + email
-
-			return nil, status.Errorf(codes.ResourceExhausted, "Rate Limited")
-		}
-	} else {
-		// Handle cases where the email field is missing/empty
-		fmt.Printf("Could not extract email for method: %s\n", fullMethod)
-	}
-
-	// 4. Proceed to the next handler
-	return handler(ctx, req)
 }
 
 func RateLimiterMatcher(ctx context.Context, callMeta interceptors.CallMeta) bool {

@@ -6,6 +6,7 @@ import (
 	"github.com/jorwong/go_user_accounts/pb"
 	jwt "github.com/jorwong/go_user_accounts/pkg/jwt"
 	pkg "github.com/jorwong/go_user_accounts/pkg/logging"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -14,7 +15,8 @@ import (
 
 type Server struct {
 	pb.UserAccountsServer
-	DB *gorm.DB
+	DB  *gorm.DB
+	RDB *redis.Client
 }
 
 func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterReply, error) {
@@ -87,7 +89,7 @@ func (s *Server) Logout(ctx context.Context, in *pb.LogOutRequest) (*pb.LogOutRe
 		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
 	}
 
-	err = models.RevokeSession(foundUser)
+	err = models.RevokeSession(foundUser, s.RDB)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Internal Server Error.")
 	}

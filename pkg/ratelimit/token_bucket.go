@@ -3,7 +3,6 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"github.com/jorwong/go_user_accounts/models"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
@@ -56,14 +55,12 @@ var tokenBucketScript = redis.NewScript(`
 	return allowed
 `)
 
-func IsAllowed(email string) (bool, error) {
+func IsAllowed(email string, rdb *redis.Client) (bool, error) {
 	//only the email is hashed next time for sharding
 	keyTokenCount := "rate_limit:{" + email + "}:token_count"
 	keyLastRefilled := "rate_limit:{" + email + "}:last_refilled"
 
 	currentTime := time.Now().Unix()
-
-	rdb := models.GetConnectionToRedis()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

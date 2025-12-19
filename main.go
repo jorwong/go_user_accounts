@@ -18,6 +18,8 @@ func main() {
 	if err != nil {
 		return
 	}
+
+	rdb := models.GetConnectionToRedis()
 	pkg.StartLoggerWorker()
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -30,12 +32,12 @@ func main() {
 			selector.MatchFunc(api.AuthMatcher),
 		),
 		selector.UnaryServerInterceptor(
-			api.RateLimter,
+			api.RateLimiterInterceptor(rdb),
 			selector.MatchFunc(api.RateLimiterMatcher),
 		),
 	))
 
-	server := &api.Server{DB: DB}
+	server := &api.Server{DB: DB, RDB: rdb}
 
 	pb.RegisterUserAccountsServer(s, server)
 	reflection.Register(s)

@@ -29,8 +29,7 @@ func CreateSession(user *User, timeExpire time.Time, token string, DB *gorm.DB) 
 }
 
 // userId -> session
-func CreateRedisSession(token string, expireTime time.Time, user *User) (string, bool, error) {
-	rdb := GetConnectionToRedis()
+func CreateRedisSession(token string, expireTime time.Time, user *User, rdb *redis.Client) (string, bool, error) {
 
 	// Create Redis Session if it doesnt exist in the DB else GET
 	key := fmt.Sprintf("session:%s", user.Email)
@@ -63,9 +62,7 @@ func CreateRedisSession(token string, expireTime time.Time, user *User) (string,
 	return existingValue, false, nil
 }
 
-func RevokeSession(user *User) error {
-	rdb := GetConnectionToRedis()
-
+func RevokeSession(user *User, rdb *redis.Client) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
